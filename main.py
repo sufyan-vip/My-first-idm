@@ -140,13 +140,14 @@ def _mark_portable(config) -> None:
 # ---------------------------------------------------------------------------
 
 def run_gui(args) -> int:
-    from PyQt6.QtCore import Qt
     from PyQt6.QtGui import QIcon
-    from PyQt6.QtWidgets import QApplication, QMessageBox
+    from PyQt6.QtWidgets import QApplication
 
+    # Qt6 always enables high-DPI scaling and high-DPI pixmaps; the old
+    # AA_EnableHighDpiScaling / AA_UseHighDpiPixmaps attributes were removed
+    # from Qt, so referencing them crashes startup with
+    # "AttributeError: AA_EnableHighDpiScaling" under PyQt6.
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
     app.setApplicationName("Internet Download Manager")
