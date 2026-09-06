@@ -1,0 +1,12 @@
+# ---------------------------------------------------------------------------
+# Internet Download Manager – Python dependencies
+#
+# Runtime (needed to run the application):
+PyQt6==6.11.0
+requests==2.34.2
+plyer==2.1.0            # native Windows toast notifications (optional at runtime –
+                        # the app degrades gracefully if it is missing)
+
+# Development / build (needed for tests and the PyInstaller build):
+pytest==9.1.1
+pyinstaller>=6.6,<7
