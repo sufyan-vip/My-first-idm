@@ -64,10 +64,9 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-
+        
       - name: Build with PyInstaller
-        run: pyinstaller idm.spec --noconfirm
-
+        run: pyinstaller idm.spec --noconfirm --distpath build/dist --workpath build/pyi_build
       # `windows-latest` is the windows-2025 image, which does NOT ship NSIS
       # (only windows-2022 preinstalls NSIS 3.10). Install it with the
       # Chocolatey that is already on the runner.
