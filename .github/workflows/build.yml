@@ -1,11 +1,10 @@
 # ===========================================================================
-#  Internet Download Manager – CI / build pipeline
+#  TurboFetch Download Manager - CI / build pipeline
 #
-#  • Runs the full test suite (offscreen Qt) on every push / PR.
-#  • Builds the Windows .exe with PyInstaller (onefile, windowed).
-#  • Installs NSIS (absent from the windows-2025 image behind
-#    `windows-latest`) and wraps the exe in an installer.
-#  • Uploads the artifacts to the run, and – when a `v*` tag is pushed –
+#  - Runs the full test suite (offscreen Qt) on every push / PR.
+#  - Builds the Windows .exe with PyInstaller (onefile, windowed).
+#  - Installs NSIS and wraps the exe in an installer.
+#  - Uploads the artifacts to the run, and when a v* tag is pushed,
 #    publishes them as a GitHub Release.
 # ===========================================================================
 
@@ -13,10 +12,10 @@ name: Build Windows EXE
 
 on:
   push:
-    branches: [main]
+    branches: [main, arena/01a07858-my-first-idm]
     tags: ["v*"]
   pull_request:
-    branches: [main]
+    branches: [main, arena/01a07858-my-first-idm]
   workflow_dispatch:
 
 concurrency:
@@ -28,6 +27,7 @@ jobs:
   test:
     name: Test (Windows, offscreen Qt)
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -52,6 +52,7 @@ jobs:
     name: Build Windows EXE
     runs-on: windows-latest
     needs: test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -64,61 +65,69 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-        
+
       - name: Build with PyInstaller
         run: pyinstaller idm.spec --noconfirm --distpath build/dist --workpath build/pyi_build
-      # `windows-latest` is the windows-2025 image, which does NOT ship NSIS
-      # (only windows-2022 preinstalls NSIS 3.10). Install it with the
-      # Chocolatey that is already on the runner.
+
       - name: Install NSIS
         shell: pwsh
         run: |
           choco install nsis --no-progress -y
           if ($LASTEXITCODE -ne 0) { throw "Chocolatey could not install NSIS (exit $LASTEXITCODE)" }
+
           $makensis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
-          if (-not $makensis) { $makensis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe" }
-          if (-not (Test-Path $makensis)) { throw "makensis not found after NSIS install" }
+          if (-not $makensis) {
+            $makensis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
+          }
+
+          if (-not (Test-Path $makensis)) {
+            throw "makensis not found after NSIS install"
+          }
+
           & $makensis /VERSION
           "MAKENSIS=$makensis" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build NSIS installer
         shell: pwsh
-        # quoted: a leading '&' would otherwise be parsed as a YAML anchor
-        run: "& $env:MAKENSIS build/installer.nsi"
+        run: '& $env:MAKENSIS build/installer.nsi'
 
-      - name: Package portable exe (zip)
+      - name: Package portable exe zip
         shell: pwsh
-        run: Compress-Archive -Path "build/dist/InternetDownloadManager.exe" -DestinationPath "build/dist/InternetDownloadManager-portable.zip" -Force
+        run: Compress-Archive -Path "build/dist/TurboFetch.exe" -DestinationPath "build/dist/TurboFetch-portable.zip" -Force
 
-      # Wildcards are fragile in artifact paths and `gh` would receive the
-      # literal '*' – give the installer one fixed, stable name.
       - name: Normalize installer name
         shell: pwsh
         run: |
-          $setup = Get-ChildItem "build/dist/InternetDownloadManager-Setup-*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if (-not $setup) { throw "NSIS installer was not produced in build/dist" }
-          Copy-Item $setup.FullName "build/dist/InternetDownloadManager-Setup.exe" -Force
-          Write-Host "Installer: $($setup.Name) -> InternetDownloadManager-Setup.exe"
+          $setup = Get-ChildItem "build/dist/TurboFetch-Setup-*.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $setup) {
+            throw "NSIS installer was not produced in build/dist"
+          }
+
+          Copy-Item $setup.FullName "build/dist/TurboFetch-Setup.exe" -Force
+          Write-Host "Installer: $($setup.Name) -> TurboFetch-Setup.exe"
 
       - name: Upload portable EXE
         uses: actions/upload-artifact@v7
         with:
-          name: InternetDownloadManager-windows
-          path: build/dist/InternetDownloadManager.exe
+          name: TurboFetch-windows
+          path: build/dist/TurboFetch.exe
           if-no-files-found: error
 
       - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
-          name: InternetDownloadManager-setup
-          path: build/dist/InternetDownloadManager-Setup.exe
+          name: TurboFetch-setup
+          path: build/dist/TurboFetch-Setup.exe
           if-no-files-found: error
 
       - name: Upload portable zip
         uses: actions/upload-artifact@v7
         with:
-          name: InternetDownloadManager-portable
-          path: build/dist/InternetDownloadManager-portable.zip
+          name: TurboFetch-portable
+          path: build/dist/TurboFetch-portable.zip
           if-no-files-found: error
 
   # ---------------------------------------------------------------- release
@@ -129,23 +138,24 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+
     steps:
       - name: Download portable EXE
         uses: actions/download-artifact@v8
         with:
-          name: InternetDownloadManager-windows
+          name: TurboFetch-windows
           path: release
 
       - name: Download installer
         uses: actions/download-artifact@v8
         with:
-          name: InternetDownloadManager-setup
+          name: TurboFetch-setup
           path: release
 
       - name: Download portable zip
         uses: actions/download-artifact@v8
         with:
-          name: InternetDownloadManager-portable
+          name: TurboFetch-portable
           path: release
 
       - name: Create GitHub Release
@@ -155,5 +165,15 @@ jobs:
         run: |
           $tag = $env:GITHUB_REF_NAME
           $version = $tag -replace '^v', ''
-          gh release create $tag "release/InternetDownloadManager.exe" "release/InternetDownloadManager-Setup.exe" "release/InternetDownloadManager-portable.zip" --title "Internet Download Manager $version" --notes "Windows build - portable single exe, NSIS installer and portable zip." --verify-tag
-          if ($LASTEXITCODE -ne 0) { throw "gh release create failed for $tag" }
+
+          gh release create $tag `
+            "release/TurboFetch.exe" `
+            "release/TurboFetch-Setup.exe" `
+            "release/TurboFetch-portable.zip" `
+            --title "TurboFetch Download Manager $version" `
+            --notes "Windows build - portable single exe, NSIS installer and portable zip." `
+            --verify-tag
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "gh release create failed for $tag"
+          }
