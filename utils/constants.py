@@ -16,11 +16,11 @@ import sys
 # Application identity
 # ---------------------------------------------------------------------------
 
-APP_NAME = "Internet Download Manager"
-APP_SHORT_NAME = "IDM Pro"
+APP_NAME = "TurboFetch Download Manager"
+APP_SHORT_NAME = "TurboFetch"
 APP_VERSION = "1.0.0"
-APP_ORG = "IDM Pro"
-APP_ID = "idm-pro"
+APP_ORG = "TurboFetch"
+APP_ID = "turbofetch"
 
 # ---------------------------------------------------------------------------
 # Download lifecycle states
@@ -138,7 +138,7 @@ DEFAULTS = {
     "timeout": "30",               # seconds per request chunk
     "retries": "5",
     "theme": "dark",               # dark | light | system
-    "minimize_to_tray": "true",
+    "minimize_to_tray": "false",
     "auto_start": "false",
     "auto_resume": "true",         # resume incomplete downloads on startup
     "notifications_enabled": "true",

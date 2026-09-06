@@ -9,6 +9,7 @@ notifications the app still works.
 from __future__ import annotations
 
 import os
+import time
 from typing import Optional
 
 import sys
@@ -19,6 +20,10 @@ from utils.logger import get_logger
 log = get_logger("notify")
 
 _sounds: dict[str, object] = {}  # name -> QSoundEffect
+_last_notifications: dict[tuple[str, str], float] = {}
+_recent_notifications: list[float] = []
+_MIN_REPEAT_SECONDS = 20.0
+_MAX_PER_MINUTE = 4
 
 
 def _resource_path(*parts: str) -> str:
@@ -31,12 +36,25 @@ def _resource_path(*parts: str) -> str:
 
 
 def notify(title: str, message: str, image: Optional[str] = None) -> bool:
-    """Show a desktop notification.  Returns True on success.
+    """Show one rate-limited desktop notification.
 
-    Tries plyer first (native toasts on Windows 10/11); falls back to a Qt
-    tray balloon when the tray icon was supplied to the caller – the caller
-    is responsible for that second chance, we only do the plyer attempt here.
+    Production builds must never flood Windows Action Center.  Identical
+    notifications are suppressed for a short cooldown and a hard per-minute
+    cap protects the user from accidental notification storms.
     """
+    now = time.monotonic()
+    key = ((title or "").strip(), (message or "").strip())
+    last = _last_notifications.get(key, 0.0)
+    if now - last < _MIN_REPEAT_SECONDS:
+        log.debug("notification suppressed by repeat cooldown: %s", title)
+        return False
+
+    global _recent_notifications
+    _recent_notifications = [t for t in _recent_notifications if now - t < 60.0]
+    if len(_recent_notifications) >= _MAX_PER_MINUTE:
+        log.debug("notification suppressed by per-minute cap: %s", title)
+        return False
+
     try:
         from plyer import notification
 
@@ -47,6 +65,8 @@ def notify(title: str, message: str, image: Optional[str] = None) -> bool:
             app_icon=image or _resource_path("ui", "resources", "app_icon.png"),
             timeout=6,
         )
+        _last_notifications[key] = now
+        _recent_notifications.append(now)
         return True
     except Exception as exc:  # plyer missing, headless session, etc.
         log.debug("plyer notification failed (%s); falling back", exc)

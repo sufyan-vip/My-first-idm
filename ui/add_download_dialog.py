@@ -13,23 +13,23 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 
-from PyQt6.QtCore import QThread, QTimer, Qt, pyqtSignal
+from PyQt6.QtCore import QDate, QThread, QTime, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDateEdit,
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QPushButton,
     QRadioButton,
     QSpinBox,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -54,6 +54,7 @@ from utils.constants import (
 )
 from utils.file_utils import human_size
 from utils.logger import get_logger
+from ui.icons import icon
 
 log = get_logger("ui.add")
 
@@ -88,7 +89,7 @@ class AddDownloadDialog(QDialog):
         self._probe_worker: Optional[_ProbeWorker] = None
         self._probe_for_url: str = ""
         self._name_autofilled: bool = True
-        self.setWindowTitle("➕ Add New Download")
+        self.setWindowTitle("Add New Download")
         self.setMinimumWidth(620)
         self._build_ui(default_folder)
         self._probe_timer = QTimer(self)
@@ -107,9 +108,9 @@ class AddDownloadDialog(QDialog):
         url_row = QHBoxLayout()
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText(
-            "https://example.com/files/big-file.zip  (or FTP: ftp://…)")
+            "https://example.com/files/big-file.zip  (or FTP: ftp://...)")
         self.url_edit.textChanged.connect(lambda _t: self._url_changed())
-        paste_btn = QPushButtonFactory(self._paste_from_clipboard, "📋 Paste")
+        paste_btn = QPushButtonFactory(self._paste_from_clipboard, "Paste", "paste")
         url_row.addWidget(self.url_edit, 1)
         url_row.addWidget(paste_btn)
         root.addLayout(url_row)
@@ -130,7 +131,7 @@ class AddDownloadDialog(QDialog):
         save_row = QHBoxLayout()
         self.folder_edit = QLineEdit(default_folder)
         self.folder_edit.setReadOnly(True)
-        browse_btn = QPushButtonFactory(self._choose_folder, "📁 Browse…")
+        browse_btn = QPushButtonFactory(self._choose_folder, "Browse...", "folder")
         save_row.addWidget(self.folder_edit, 1)
         save_row.addWidget(browse_btn)
         form.addRow("Save to:", self._wrap(save_row))
@@ -140,7 +141,7 @@ class AddDownloadDialog(QDialog):
         for key, info in CATEGORY_INFO.items():
             if key == Category.AUTO:
                 continue
-            self.category_combo.addItem(f"{info['emoji']}  {info['label']}", key)
+            self.category_combo.addItem(icon("folder"), info['label'], key)
         self.category_combo.currentIndexChanged.connect(self._category_changed)
         form.addRow("Category:", self.category_combo)
         root.addLayout(form)
@@ -178,10 +179,11 @@ class AddDownloadDialog(QDialog):
         self.later_radio = QRadioButton("Later")
         sched_row.addWidget(self.now_radio)
         sched_row.addWidget(self.later_radio)
-        self.date_edit = QDateEdit(datetime.now().date())
+        now = datetime.now()
+        self.date_edit = QDateEdit(QDate(now.year, now.month, now.day))
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setEnabled(False)
-        self.time_edit = QTimeEdit(datetime.now().time())
+        self.time_edit = QTimeEdit(QTime(now.hour, now.minute, now.second))
         self.time_edit.setEnabled(False)
         self.now_radio.toggled.connect(self._schedule_mode)
         self.later_radio.toggled.connect(self._schedule_mode)
@@ -221,9 +223,9 @@ class AddDownloadDialog(QDialog):
 
         # ---------------------------------------------------------- buttons
         buttons = QHBoxLayout()
-        cancel = QPushButtonFactory(self.reject, "Cancel")
-        queue_btn = QPushButtonFactory(self._add_to_queue, "⏳ Add to Queue")
-        start_btn = QPushButtonFactory(self._start_now, "⬇ Start Download")
+        cancel = QPushButtonFactory(self.reject, "Cancel", "cancel")
+        queue_btn = QPushButtonFactory(self._add_to_queue, "Add to Queue", "pause")
+        start_btn = QPushButtonFactory(self._start_now, "Start Download", "download")
         start_btn.setObjectName("primaryButton")
         buttons.addStretch(1)
         buttons.addWidget(cancel)
@@ -251,7 +253,7 @@ class AddDownloadDialog(QDialog):
         if self._probe_worker and self._probe_worker.isRunning():
             self._probe_worker.wait(3000)
         self._probe = None
-        self.status_label.setText("🔎 Probing URL…")
+        self.status_label.setText("Checking link...")
         self._probe_worker = _ProbeWorker(
             url,
             self.config.get("user_agent") or "",
@@ -274,12 +276,12 @@ class AddDownloadDialog(QDialog):
             ranges = "multi-segment OK" if result.accept_ranges else "single stream"
             self.status_label.setObjectName("successText")
             self.status_label.setText(
-                f"✅ {result.url}\n   {size}  •  {ranges}"
-                f"  •  {result.content_type or 'content-type unknown'}")
+                f"Ready: {result.url}\n   {size}  -  {ranges}"
+                f"  -  {result.content_type or 'content-type unknown'}")
         else:
             self._probe = None
             self.status_label.setObjectName("errorText")
-            self.status_label.setText(f"⚠ {result}")
+            self.status_label.setText(f"Warning: {result}")
 
     def _auto_category(self) -> None:
         url = strip_url(self.url_edit.text())
@@ -323,7 +325,7 @@ class AddDownloadDialog(QDialog):
                 self.url_edit.setText(text)
                 self.status_label.setObjectName("errorText")
                 self.status_label.setText(
-                    "⚠ Could not find a valid http/https/ftp URL in clipboard")
+                    "Could not find a valid http/https/ftp URL in clipboard")
 
     # ------------------------------------------------------------ actions
 
@@ -360,8 +362,8 @@ class AddDownloadDialog(QDialog):
 
         scheduled = None
         if self.later_radio.isChecked():
-            when = datetime.combine(self.date_edit.date().toPyDateTime().date(),
-                                    self.time_edit.time().toPyDateTime().time())
+            when = datetime.combine(self.date_edit.date().toPyDate(),
+                                    self.time_edit.time().toPyTime())
             if when < datetime.now():
                 when += timedelta(hours=1)
             scheduled = to_db_time(when)
@@ -398,14 +400,14 @@ class AddDownloadDialog(QDialog):
         if not self.name_edit.text().strip():
             self.name_edit.setText(url_filename(url))
         if not os.path.isdir(self.folder_edit.text().strip()):
-            return "The save folder does not exist – choose a valid folder"
+            return "The save folder does not exist - choose a valid folder"
         return None
 
     def _start_now(self) -> None:
         error = self._validate()
         if error:
             self.status_label.setObjectName("errorText")
-            self.status_label.setText(f"⚠ {error}")
+            self.status_label.setText(f"Error: {error}")
             return
         self.download_requested.emit(self._build_download(Status.QUEUED), True)
         self.accept()
@@ -414,9 +416,12 @@ class AddDownloadDialog(QDialog):
         error = self._validate()
         if error:
             self.status_label.setObjectName("errorText")
-            self.status_label.setText(f"⚠ {error}")
+            self.status_label.setText(f"Error: {error}")
             return
-        self.download_requested.emit(self._build_download(Status.QUEUED), False)
+        # Keep manual queue entries stopped until the user presses Start queue
+        # or Resume. Previously this emitted QUEUED and the engine started it
+        # on the next tick, so the Queue button behaved the same as Start.
+        self.download_requested.emit(self._build_download(Status.PAUSED), False)
         self.accept()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
@@ -431,11 +436,11 @@ def category_from_name(name: str) -> str:
     return category_for_extension(name)
 
 
-def QPushButtonFactory(callback, text: str):
+def QPushButtonFactory(callback, text: str, icon_name: str = ""):
     """Tiny helper: a QPushButton wired to *callback* (keeps layout code tidy)."""
-    from PyQt6.QtWidgets import QPushButton
-
     btn = QPushButton(text)
+    if icon_name:
+        btn.setIcon(icon(icon_name))
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     btn.clicked.connect(callback)
     return btn

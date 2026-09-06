@@ -3,7 +3,7 @@ Main application window.
 
 Owns the menu bar, toolbar, search/filter row, category tabs, the download
 list (custom row widgets), the speed graph, the status bar, drag & drop,
-clipboard URL detection and all engine → UI signal wiring.
+clipboard URL detection and all engine -> UI signal wiring.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 import sys
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QAction,
     QCloseEvent,
@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFormLayout,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -66,6 +67,7 @@ from utils.file_utils import human_size, human_speed
 from utils.logger import get_logger
 from utils.notifications import notify
 from utils.system_utils import open_file, open_folder
+from ui.icons import icon
 
 log = get_logger("ui.main")
 
@@ -147,7 +149,7 @@ class _UpdateWorker(QThread):
                 self.done.emit(
                     False,
                     f"New version available: v{latest}\n"
-                    f"You have v{APP_VERSION} – download it from the "
+                    f"You have v{APP_VERSION} - download it from the "
                     "project releases page.")
             else:
                 self.done.emit(True,
@@ -165,7 +167,7 @@ class DetailsDialog(QDialog):
 
     def __init__(self, snap, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"Details – {snap.file_name}")
+        self.setWindowTitle(f"Details - {snap.file_name}")
         self.setMinimumWidth(560)
         form = QFormLayout(self)
         form.setSpacing(8)
@@ -181,15 +183,15 @@ class DetailsDialog(QDialog):
             ("Current speed", human_speed(snap.speed)),
             ("Average speed", human_speed(snap.avg_speed)),
             ("Segments", f"{snap.segments_completed}/{snap.segments_total} done"
-                         if snap.segments_total else "–"),
+                         if snap.segments_total else "-"),
             ("Priority", snap.priority),
             ("Category", CATEGORY_INFO.get(snap.category, {}).get(
                 "label", snap.category)),
-            ("Created", snap.created_at or "–"),
-            ("Completed", snap.completed_at or "–"),
-            ("Scheduled", snap.scheduled_time or "–"),
-            ("SHA-256", snap.checksum_sha256 or "–"),
-            ("MD5", snap.checksum_md5 or "–"),
+            ("Created", snap.created_at or "-"),
+            ("Completed", snap.completed_at or "-"),
+            ("Scheduled", snap.scheduled_time or "-"),
+            ("SHA-256", snap.checksum_sha256 or "-"),
+            ("MD5", snap.checksum_md5 or "-"),
         ]
         if snap.error_message:
             rows.append(("Error", snap.error_message))
@@ -201,12 +203,12 @@ class DetailsDialog(QDialog):
 
 def _status_text(snap) -> str:
     return {
-        Status.COMPLETED: "✅ Completed",
-        Status.FAILED: "✖ Failed",
-        Status.PAUSED: "⏸ Paused",
-        Status.QUEUED: "⏳ Queued",
-        Status.SCHEDULED: "🕒 Scheduled",
-        Status.CANCELED: "⊘ Canceled",
+        Status.COMPLETED: "Completed",
+        Status.FAILED: "Failed",
+        Status.PAUSED: "Paused",
+        Status.QUEUED: "Queued",
+        Status.SCHEDULED: "Scheduled",
+        Status.CANCELED: "Canceled",
     }.get(snap.status, snap.status)
 
 
@@ -229,6 +231,7 @@ class MainWindow(QMainWindow):
         self._hidden_to_tray = False
         self._quitting = False
         self._speed_test_worker: Optional[_SpeedTestWorker] = None
+        self._clipboard_prompted: set[str] = set()
 
         self.setWindowTitle(APP_NAME)
         self.resize(1060, 700)
@@ -251,8 +254,7 @@ class MainWindow(QMainWindow):
         self._clipboard_monitor = ClipboardMonitor(
             enabled=config.get_bool("clipboard_detect"))
         self._clipboard_monitor.url_detected.connect(self._on_clipboard_url)
-        self._clipboard_monitor.urls_detected.connect(
-            lambda urls: [self._on_clipboard_url(u) for u in urls])
+        self._clipboard_monitor.urls_detected.connect(self._on_clipboard_urls)
 
         config.changed.connect(self._on_config_changed)
 
@@ -265,6 +267,7 @@ class MainWindow(QMainWindow):
                 f"{len(recovered)} incomplete download(s) were found from the "
                 "last session.\nThey are being resumed automatically."))
         self.refresh()
+        QTimer.singleShot(250, self._prefill_quick_url_from_clipboard)
 
     # ------------------------------------------------------------ structure
 
@@ -272,38 +275,38 @@ class MainWindow(QMainWindow):
         m = self.menuBar()
 
         file_menu = m.addMenu("&File")
-        self._add(file_menu, "➕  Add URL…", self.open_add_dialog, "Ctrl+T")
-        self._add(file_menu, "📋  Paste from clipboard",
-                  self.paste_from_clipboard, "Ctrl+V")
-        self._add(file_menu, "📄  Add from file…", self.add_from_file)
+        self._add(file_menu, "Add URL...", self.open_add_dialog, "Ctrl+T", "add")
+        self._add(file_menu, "Paste from clipboard",
+                  self.paste_from_clipboard, "Ctrl+V", "paste")
+        self._add(file_menu, "Add from file...", self.add_from_file, icon_name="file")
         file_menu.addSeparator()
-        self._add(file_menu, "Exit", self.close)
+        self._add(file_menu, "Exit", self.close, icon_name="close")
 
         dl_menu = m.addMenu("&Downloads")
-        self._add(dl_menu, "⏸  Pause all", self.engine.pause_all)
-        self._add(dl_menu, "▶  Resume all", self.engine.resume_all)
-        self._add(dl_menu, "⊘  Cancel all active", self._cancel_all)
+        self._add(dl_menu, "Pause all", self.engine.pause_all, icon_name="pause")
+        self._add(dl_menu, "Resume all", self.engine.resume_all, icon_name="resume")
+        self._add(dl_menu, "Cancel all active", self._cancel_all, icon_name="cancel")
         dl_menu.addSeparator()
-        self._add(dl_menu, "📁  Open download folder", self._open_download_folder)
-        self._add(dl_menu, "🧹  Clear completed", self._clear_completed)
+        self._add(dl_menu, "Open download folder", self._open_download_folder, icon_name="folder")
+        self._add(dl_menu, "Clear completed", self._clear_completed, icon_name="delete")
 
         queue_menu = m.addMenu("&Queue")
-        self._add(queue_menu, "▶  Start queue", self.engine.resume_all)
-        self._add(queue_menu, "⏸  Pause queue", self.engine.pause_all)
+        self._add(queue_menu, "Start queue", self.engine.resume_all, icon_name="resume")
+        self._add(queue_menu, "Pause queue", self.engine.pause_all, icon_name="pause")
         queue_menu.addSeparator()
-        self._add(queue_menu, "📜  History", self.open_history)
+        self._add(queue_menu, "History", self.open_history, icon_name="history")
 
         tools_menu = m.addMenu("&Tools")
-        self._add(tools_menu, "🚀  Internet speed test", self.run_speed_test)
-        self._add(tools_menu, "🔄  Check for updates", self.check_updates)
+        self._add(tools_menu, "Internet speed test", self.run_speed_test, icon_name="speed")
+        self._add(tools_menu, "Check for updates", self.check_updates, icon_name="refresh")
         tools_menu.addSeparator()
-        self._add(tools_menu, "⚙  Settings…", self.open_settings)
+        self._add(tools_menu, "Settings...", self.open_settings, icon_name="settings")
 
         help_menu = m.addMenu("&Help")
-        self._add(help_menu, "ℹ  About", lambda: AboutDialog(self).exec())
+        self._add(help_menu, "About", lambda: AboutDialog(self).exec(), icon_name="info")
 
-    def _add(self, menu, text: str, callback, shortcut: str = "") -> QAction:
-        action = QAction(text, self)
+    def _add(self, menu, text: str, callback, shortcut: str = "", icon_name: str = "") -> QAction:
+        action = QAction(icon(icon_name), text, self) if icon_name else QAction(text, self)
         if shortcut:
             action.setShortcut(QKeySequence(shortcut))
         action.triggered.connect(callback)
@@ -314,39 +317,70 @@ class MainWindow(QMainWindow):
         tb = QToolBar("Main toolbar")
         tb.setMovable(False)
         tb.setFloatable(False)
+        tb.setIconSize(QSize(22, 22))
         self.addToolBar(tb)
 
-        def tool(text, tip, callback):
-            a = QAction(text, self)
+        def tool(icon_name, text, tip, callback):
+            a = QAction(icon(icon_name), text, self)
             a.setToolTip(tip)
             a.triggered.connect(callback)
             tb.addAction(a)
             return a
 
-        tool("➕", "Add URL (Ctrl+T)", self.open_add_dialog)
-        tool("📋", "Paste from clipboard", self.paste_from_clipboard)
+        tool("add", "Add", "Add URL (Ctrl+T)", self.open_add_dialog)
+        tool("paste", "Paste", "Paste from clipboard", self.paste_from_clipboard)
         tb.addSeparator()
-        tool("⏸", "Pause all", self.engine.pause_all)
-        tool("▶", "Resume all", self.engine.resume_all)
-        tool("", "Cancel selected", self._cancel_selected)
-        tool("🗑", "Delete selected", self._delete_selected)
+        tool("pause", "Pause all", "Pause all", self.engine.pause_all)
+        tool("resume", "Resume all", "Resume all", self.engine.resume_all)
+        tool("cancel", "Cancel", "Cancel selected", self._cancel_selected)
+        tool("delete", "Delete", "Delete selected", self._delete_selected)
         tb.addSeparator()
-        tool("⏬", "Start queue", self.engine.resume_all)
+        tool("download", "Start queue", "Start queue", self.engine.resume_all)
         tb.addSeparator()
-        tool("📜", "History", self.open_history)
-        tool("⚙", "Settings", self.open_settings)
+        tool("history", "History", "History", self.open_history)
+        tool("settings", "Settings", "Settings", self.open_settings)
 
     def _build_central(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(10, 8, 10, 6)
-        root.setSpacing(8)
+        root.setContentsMargins(14, 12, 14, 8)
+        root.setSpacing(10)
+
+        hero = QFrame()
+        hero.setObjectName("quickDownloadCard")
+        hero_layout = QVBoxLayout(hero)
+        hero_layout.setContentsMargins(18, 16, 18, 16)
+        hero_layout.setSpacing(10)
+        title = QLabel("Paste a link to start a download")
+        title.setObjectName("heroTitle")
+        subtitle = QLabel("Copy a URL, paste it here, review the file name and click Start Download.")
+        subtitle.setObjectName("secondaryText")
+        self.quick_url_edit = QLineEdit()
+        self.quick_url_edit.setObjectName("quickUrlEdit")
+        self.quick_url_edit.setPlaceholderText("https://example.com/file.zip")
+        self.quick_url_edit.returnPressed.connect(self._quick_start)
+        quick_row = QHBoxLayout()
+        quick_row.setSpacing(8)
+        quick_row.addWidget(self.quick_url_edit, 1)
+        paste_btn = QPushButton("Paste")
+        paste_btn.setIcon(icon("paste"))
+        paste_btn.clicked.connect(self._quick_paste)
+        start_btn = QPushButton("Start Download")
+        start_btn.setObjectName("primaryButton")
+        start_btn.setIcon(icon("download"))
+        start_btn.clicked.connect(self._quick_start)
+        quick_row.addWidget(paste_btn)
+        quick_row.addWidget(start_btn)
+        hero_layout.addWidget(title)
+        hero_layout.addWidget(subtitle)
+        hero_layout.addLayout(quick_row)
+        root.addWidget(hero)
 
         # search / filter / sort row
         top = QHBoxLayout()
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("🔍  Search downloads…")
+        self.search_edit.setPlaceholderText("Search downloads...")
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(lambda _t: self.refresh())
         top.addWidget(self.search_edit, 1)
@@ -356,7 +390,7 @@ class MainWindow(QMainWindow):
         for key, info in CATEGORY_INFO.items():
             if key == Category.AUTO:
                 continue
-            self.category_filter.addItem(f"{info['emoji']} {info['label']}", key)
+            self.category_filter.addItem(icon("folder"), info['label'], key)
         self.category_filter.currentIndexChanged.connect(lambda _i: self.refresh())
         top.addWidget(self.category_filter)
 
@@ -413,10 +447,10 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self) -> None:
         bar = QStatusBar()
         self.setStatusBar(bar)
-        self.status_counts = QLabel("⬇ 0 active")
+        self.status_counts = QLabel("0 active")
         self.status_speed = QLabel("Total: 0 B/s")
         self.status_queue = QLabel("Queue: 0")
-        self.status_net = QLabel("🌐 online")
+        self.status_net = QLabel("Online")
         bar.addWidget(self.status_counts)
         bar.addPermanentWidget(self.status_queue)
         bar.addPermanentWidget(self.status_speed)
@@ -474,7 +508,7 @@ class MainWindow(QMainWindow):
         else:
             for dl_id in new_order:
                 row = self._rows.get(dl_id)
-                if row is None:            # defensive – should not happen
+                if row is None:            # defensive - should not happen
                     self._create_row(dl_id, by_id[dl_id], width)
                 else:
                     row.update_snapshot(by_id[dl_id])
@@ -490,7 +524,7 @@ class MainWindow(QMainWindow):
         paused = counts.get(Status.PAUSED, 0)
         done = counts.get(Status.COMPLETED, 0)
         self.status_counts.setText(
-            f"⬇ {active} active   |   ⏸ {paused} paused   |   ✅ {done} done")
+            f"{active} active   |   {paused} paused   |   {done} done")
         total_speed = self.engine.total_speed
         self.status_speed.setText(f"Total speed: {human_speed(total_speed)}")
         self.status_queue.setText(
@@ -538,7 +572,7 @@ class MainWindow(QMainWindow):
         by the event loop).  Re-attaching the *same* widget to a fresh item
         after ``clear()`` therefore leaves dangling pointers in the view's
         internal editor tracking and segfaults on the next layout pass.
-        We never reuse rows across a ``clear()`` – the old ones are deleted
+        We never reuse rows across a ``clear()`` - the old ones are deleted
         and brand-new widgets are created for the whole visible set.
         """
         self.list.clear()
@@ -566,7 +600,7 @@ class MainWindow(QMainWindow):
     def _confirm_cancel(self, dl_id: int) -> None:
         answer = QMessageBox.question(
             self, "Cancel download",
-            "Cancel this download?\n(The partial file is kept – you can "
+            "Cancel this download?\n(The partial file is kept - you can "
             "resume it later from history.)")
         if answer == QMessageBox.StandardButton.Yes:
             self.engine.cancel_download(dl_id, delete_files=False)
@@ -640,6 +674,41 @@ class MainWindow(QMainWindow):
                 self.engine.delete_download(dl.id, delete_files=False)
 
     # -------------------------------------------------------- add actions
+
+    def _clipboard_urls(self) -> list[str]:
+        text = QApplication.clipboard().text().strip()
+        return extract_urls(text) if text else []
+
+    def _prefill_quick_url_from_clipboard(self) -> None:
+        urls = self._clipboard_urls()
+        if urls and not self.quick_url_edit.text().strip():
+            self.quick_url_edit.setText(urls[0])
+            self.statusBar().showMessage("Copied link is ready. Click Start Download when you want.", 5000)
+
+    def _quick_paste(self) -> None:
+        urls = self._clipboard_urls()
+        if urls:
+            self.quick_url_edit.setText(urls[0])
+            if len(urls) > 1:
+                self.statusBar().showMessage(f"{len(urls)} links found. The first one is ready; use Paste from clipboard for batch.", 7000)
+            return
+        text = QApplication.clipboard().text().strip()
+        if text:
+            self.quick_url_edit.setText(text)
+        else:
+            self.statusBar().showMessage("Clipboard is empty.", 4000)
+
+    def _quick_start(self) -> None:
+        url = self.quick_url_edit.text().strip()
+        if not url:
+            self._quick_paste()
+            url = self.quick_url_edit.text().strip()
+        urls = extract_urls(url)
+        if not urls:
+            QMessageBox.information(self, "Add download",
+                                    "Paste a valid http://, https:// or ftp:// link first.")
+            return
+        self.open_add_dialog(urls[0])
 
     def open_add_dialog(self, url: str = "") -> None:
         dlg = AddDownloadDialog(self.config, self.config.download_dir(), self)
@@ -724,20 +793,20 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Speed test", "A speed test is already running.")
             return
         box = QDialog(self)
-        box.setWindowTitle("🚀 Internet Speed Test")
+        box.setWindowTitle("Internet Speed Test")
         box.setFixedSize(460, 240)
         v = QVBoxLayout(box)
-        title = QLabel("🚀 Internet Speed Test")
+        title = QLabel("Internet Speed Test")
         title.setObjectName("windowTitle")
         v.addWidget(title)
         info = QLabel(f"Streaming {human_size(10 * 1024 ** 2)} from "
-                      f"{SPEED_TEST_URL.split('/')[2]} …")
+                      f"{SPEED_TEST_URL.split('/')[2]} ...")
         info.setObjectName("dim")
         v.addWidget(info)
         bar = QProgressBar()
         bar.setRange(0, 0)
         v.addWidget(bar)
-        result = QLabel("Starting…")
+        result = QLabel("Starting...")
         v.addWidget(result)
         cancel = QPushButton("Cancel")
         v.addWidget(cancel, 0, Qt.AlignmentFlag.AlignRight)
@@ -748,8 +817,8 @@ class MainWindow(QMainWindow):
         def on_done(mbps: float, ok: bool, message: str) -> None:
             bar.setRange(0, 100)
             bar.setValue(100)
-            result.setText(("✅ " if ok else "✖ ") +
-                           (f"{mbps:.2f} Mbps   •   " if ok else "") + message)
+            result.setText(("OK: " if ok else "Failed: ") +
+                           (f"{mbps:.2f} Mbps   -   " if ok else "") + message)
             box.deleteLater()
 
         worker.done.connect(on_done)
@@ -760,7 +829,7 @@ class MainWindow(QMainWindow):
     def check_updates(self) -> None:
         box = QMessageBox(self)
         box.setWindowTitle("Check for updates")
-        box.setText("🔄 Checking for updates…")
+        box.setText("Checking for updates...")
         box.setIcon(QMessageBox.Icon.Information)
         box.setStandardButtons(QMessageBox.StandardButton.Ok)
         worker = _UpdateWorker(self)
@@ -793,7 +862,7 @@ class MainWindow(QMainWindow):
                 self._tray.notify_balloon("Download failed", error[:180])
 
     def _on_network_changed(self, online: bool) -> None:
-        self.status_net.setText("🌐 online" if online else "🌐 OFFLINE")
+        self.status_net.setText("Online" if online else "Offline")
         if not online:
             QMessageBox.warning(self, "Network",
                                 "Internet connection lost.\n"
@@ -805,25 +874,36 @@ class MainWindow(QMainWindow):
             self._clipboard_monitor.set_enabled(value == "true")
         # theme changes are applied by main.py (it owns the QApplication)
 
-    def _on_clipboard_url(self, url: str) -> None:
+    def _on_clipboard_urls(self, urls: list[str]) -> None:
+        if not urls:
+            return
         if self.config.get_bool("clipboard_auto_add"):
             from core.url_parser import category_for_url, url_filename
-            name = url_filename(url)
-            self.engine.add(Download(
-                url=url, file_name=name,
-                save_path=os.path.join(self.config.download_dir(), name),
-                category=category_for_url(url)))
+            for url in urls[:25]:
+                name = url_filename(url)
+                self.engine.add(Download(
+                    url=url, file_name=name,
+                    save_path=os.path.join(self.config.download_dir(), name),
+                    category=category_for_url(url)))
+            self.statusBar().showMessage(f"Added {min(len(urls), 25)} copied links to the queue.", 6000)
+            return
+        self.quick_url_edit.setText(urls[0])
+        self.statusBar().showMessage(
+            f"{len(urls)} copied links detected. First link is ready in the paste box; no notifications were sent.",
+            7000)
+
+    def _on_clipboard_url(self, url: str) -> None:
+        if url in self._clipboard_prompted:
+            return
+        self._clipboard_prompted.add(url)
+        if self.config.get_bool("clipboard_auto_add"):
+            self._on_clipboard_urls([url])
             log.info("clipboard URL auto-added: %s", url)
-        else:
-            if self._tray is not None:
-                self._tray.notify_balloon("URL detected in clipboard",
-                                          f"{url}\nOpen the Add dialog?")
-            else:
-                if QMessageBox.question(
-                        self, "Clipboard URL",
-                        f"A download URL was pasted:\n{url}\n\nAdd it?"
-                ) == QMessageBox.StandardButton.Yes:
-                    self.open_add_dialog(url)
+            return
+        self.quick_url_edit.setText(url)
+        self.statusBar().showMessage(
+            "Copied link is ready in the paste box. Click Start Download when you want.",
+            6000)
 
     # ------------------------------------------------------------- window
 
@@ -845,7 +925,7 @@ class MainWindow(QMainWindow):
             if self._tray is not None:
                 self._tray.notify_balloon(
                     APP_NAME,
-                    "IDM Pro is still running in the tray."
+                    "TurboFetch is still running in the tray."
                     if self.engine.is_busy() else "Minimized to tray.")
             return
         self._real_cleanup(event)

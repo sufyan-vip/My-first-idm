@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Internet Download Manager – Python dependencies
+# TurboFetch Download Manager – Python dependencies
 #
 # Runtime (needed to run the application):
 PyQt6==6.11.0

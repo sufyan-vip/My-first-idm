@@ -1,10 +1,10 @@
 @echo off
 rem ===========================================================================
-rem  Internet Download Manager - local Windows build
+rem  TurboFetch Download Manager - local Windows build
 rem
 rem  Produces:
-rem    build\dist\InternetDownloadManager.exe               (portable single exe)
-rem    build\dist\InternetDownloadManager-Setup-1.0.0.exe   (NSIS installer)
+rem    build\dist\TurboFetch.exe               (portable single exe)
+rem    build\dist\TurboFetch-Setup-1.0.0.exe   (NSIS installer)
 rem
 rem  Prerequisites (all standard on a developer machine):
 rem    - Python 3.11+          (python.org)
@@ -45,8 +45,8 @@ if %errorlevel%==0 (
 echo.
 echo ===========================================================================
 echo  Build finished:
-echo    .\build\dist\InternetDownloadManager.exe
-echo    .\build\dist\InternetDownloadManager-Setup-1.0.0.exe   (if NSIS found)
+echo    .\build\dist\TurboFetch.exe
+echo    .\build\dist\TurboFetch-Setup-1.0.0.exe   (if NSIS found)
 echo ===========================================================================
 exit /b 0
 

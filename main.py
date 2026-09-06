@@ -1,5 +1,5 @@
 """
-Internet Download Manager – application entry point.
+TurboFetch Download Manager - application entry point.
 
 GUI mode (default):
     python main.py                 start the desktop application
@@ -8,8 +8,8 @@ GUI mode (default):
 CLI mode (no window, console progress):
     python main.py --url "https://example.com/file.zip" [--output DIR]
 
-The same file is the PyInstaller entry point – it doubles as the source of
-the shipped InternetDownloadManager.exe.
+The same file is the PyInstaller entry point - it doubles as the source of
+the shipped TurboFetch.exe.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def _repo_root() -> str:
 
 def setup_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="idm", description="Internet Download Manager – multi-threaded "
+        prog="turbofetch", description="TurboFetch Download Manager - multi-threaded "
                                 "download manager for Windows")
     parser.add_argument("--url", help="download this URL in CLI mode (no GUI)")
     parser.add_argument("--output", default="", help="output folder (CLI mode)")
@@ -106,7 +106,7 @@ def _bootstrap() -> tuple:
 
 
 def _bootstrap_db_path() -> str:
-    """Database path – portable if the last run used portable mode.
+    """Database path - portable if the last run used portable mode.
 
     We read a tiny marker file to survive the chicken-and-egg problem
     (config lives inside the database).
@@ -150,8 +150,8 @@ def run_gui(args) -> int:
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Internet Download Manager")
-    app.setOrganizationName("IDM Pro")
+    app.setApplicationName("TurboFetch Download Manager")
+    app.setOrganizationName("TurboFetch")
 
     db, config = _bootstrap()
 
@@ -186,7 +186,7 @@ def run_gui(args) -> int:
             window.set_tray(tray)
             if not args.minimized:
                 tray.show()
-        except Exception as exc:  # noqa: BLE001 – tray is optional
+        except Exception as exc:  # noqa: BLE001 - tray is optional
             print(f"[idm] system tray unavailable: {exc}", file=sys.stderr)
             tray = None
 
@@ -266,7 +266,7 @@ def run_cli(args) -> int:
     engine.start()
     dl_id = engine.add(dl)
 
-    print(f"⬇ Downloading {name}")
+    print(f"Downloading {name}")
     print(f"  url:    {url}")
     print(f"  output: {folder}")
     try:
@@ -276,7 +276,7 @@ def run_cli(args) -> int:
             if snap:
                 _print_progress(snap)
     except KeyboardInterrupt:
-        print("\ninterrupted – cancelling")
+        print("\ninterrupted - cancelling")
         engine.cancel_download(dl_id)
         return 130
     finally:
@@ -284,9 +284,9 @@ def run_cli(args) -> int:
         db.close()
 
     if finished["ok"]:
-        print(f"\n✅ Saved to: {finished['path']}")
+        print(f"\nSaved to: {finished['path']}")
         return 0
-    print(f"\n✖ Failed: {finished['path'] or 'unknown error'}")
+    print(f"\nFailed: {finished['path'] or 'unknown error'}")
     return 1
 
 

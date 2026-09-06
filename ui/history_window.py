@@ -29,6 +29,7 @@ from database.models import HistoryItem
 from utils.constants import CATEGORY_INFO, Category, Status
 from utils.file_utils import human_size
 from utils.logger import get_logger
+from ui.icons import icon
 
 log = get_logger("ui.history")
 
@@ -42,7 +43,7 @@ class HistoryWindow(QWidget):
         super().__init__(parent)
         self.db = db
         self.engine = engine
-        self.setWindowTitle("📜 Download History")
+        self.setWindowTitle("Download History")
         self.resize(900, 560)
 
         root = QVBoxLayout(self)
@@ -52,7 +53,7 @@ class HistoryWindow(QWidget):
         # -------------------------------------------------------- toolbar
         top = QHBoxLayout()
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("🔍 Search by name or URL…")
+        self.search_edit.setPlaceholderText("Search by name or URL...")
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(lambda _t: self.refresh())
 
@@ -61,7 +62,7 @@ class HistoryWindow(QWidget):
         for key, info in CATEGORY_INFO.items():
             if key == Category.AUTO:
                 continue
-            self.category_combo.addItem(f"{info['emoji']} {info['label']}", key)
+            self.category_combo.addItem(icon("folder"), info["label"], key)
         self.category_combo.currentIndexChanged.connect(lambda _i: self.refresh())
 
         self.status_combo = QComboBox()
@@ -97,11 +98,14 @@ class HistoryWindow(QWidget):
 
         # ---------------------------------------------------------- actions
         bottom = QHBoxLayout()
-        redl = QPushButton(" Re-download")
+        redl = QPushButton("Re-download")
+        redl.setIcon(icon("download"))
         redl.clicked.connect(self._redownload_selected)
-        export = QPushButton("📤 Export CSV…")
+        export = QPushButton("Export CSV...")
+        export.setIcon(icon("file"))
         export.clicked.connect(self._export_csv)
-        del_sel = QPushButton("🗑 Delete selected")
+        del_sel = QPushButton("Delete selected")
+        del_sel.setIcon(icon("delete"))
         del_sel.setObjectName("dangerButton")
         del_sel.clicked.connect(self._delete_selected)
         clear = QPushButton("Clear all")
@@ -133,14 +137,14 @@ class HistoryWindow(QWidget):
         for row, item in enumerate(items):
             info = CATEGORY_INFO.get(item.category, {})
             status_text = {
-                Status.COMPLETED: "✅ Completed",
-                Status.FAILED: "✖ Failed",
+                Status.COMPLETED: "Completed",
+                Status.FAILED: "Failed",
             }.get(item.status, item.status)
             values = [
                 (item.downloaded_at or "").replace("T", " "),
                 item.file_name,
                 human_size(item.file_size),
-                f"{info.get('emoji', '📂')} {info.get('label', item.category)}",
+                info.get("label", item.category),
                 status_text,
                 item.save_path,
             ]

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from typing import Callable, Optional
 
 from PyQt6.QtCore import QTimer
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
 from utils.constants import APP_NAME, IS_FROZEN
 from utils.logger import get_logger
+from ui.icons import icon
 
 log = get_logger("tray")
 
@@ -42,6 +44,7 @@ class SystemTray(QSystemTrayIcon):
         self._animate_timer.setInterval(900)
         self._animate_timer.timeout.connect(self._flip_frame)
         self._animating = False
+        self._last_balloon: dict[tuple[str, str], float] = {}
 
         for name in ("tray_idle", "tray_downloading", "tray_paused"):
             path = _resource("ui", "resources", f"{name}.png")
@@ -62,17 +65,17 @@ class SystemTray(QSystemTrayIcon):
         show = menu.addAction("Show main window")
         show.triggered.connect(self._parent.show_from_tray)
         menu.addSeparator()
-        add = menu.addAction("➕ Add download…")
+        add = menu.addAction(icon("add"), "Add download...")
         add.triggered.connect(self._parent.open_add_dialog)
         menu.addSeparator()
-        pause = menu.addAction("⏸ Pause all")
+        pause = menu.addAction(icon("pause"), "Pause all")
         pause.triggered.connect(lambda: self._parent.engine.pause_all())
-        resume = menu.addAction("▶ Resume all")
+        resume = menu.addAction(icon("resume"), "Resume all")
         resume.triggered.connect(lambda: self._parent.engine.resume_all())
         menu.addSeparator()
-        history = menu.addAction("📜 History")
+        history = menu.addAction(icon("history"), "History")
         history.triggered.connect(self._parent.open_history)
-        quit_act = menu.addAction("✖ Exit")
+        quit_act = menu.addAction(icon("close"), "Exit")
         quit_act.triggered.connect(self._parent.real_quit)
         self.setContextMenu(menu)
 
@@ -115,9 +118,14 @@ class SystemTray(QSystemTrayIcon):
     def notify_balloon(self, title: str, message: str) -> None:
         """Balloon / toast notification through the tray icon."""
         try:
-            icon = self.icon() if self.icon().isNull() is False else \
+            now = time.monotonic()
+            key = (title, message)
+            if now - self._last_balloon.get(key, 0.0) < 20.0:
+                return
+            self._last_balloon[key] = now
+            icon_obj = self.icon() if self.icon().isNull() is False else \
                 self._icon_for("idle")
-            self.showMessage(title, message, icon, 6000)
+            self.showMessage(title, message, icon_obj, 6000)
         except Exception as exc:  # noqa: BLE001
             log.debug("balloon failed: %s", exc)
 
