@@ -66,7 +66,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build with PyInstaller
-        run: pyinstaller idm.spec --noconfirm
+        # --distpath/--workpath keep the output under build/dist, where
+        # installer.nsi, the zip step and the artifact uploads expect it
+        # (PyInstaller's defaults would put it in ./dist at the repo root).
+        run: pyinstaller idm.spec --noconfirm --distpath build/dist --workpath build/pyi_build
 
       # `windows-latest` is the windows-2025 image, which does NOT ship NSIS
       # (only windows-2022 preinstalls NSIS 3.10). Install it with the

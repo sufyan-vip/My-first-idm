@@ -32,7 +32,7 @@ set QT_QPA_PLATFORM=offscreen
 python -m pytest tests -q || goto :error
 
 echo [4/4] Building the executable with PyInstaller...
-pyinstaller idm.spec --noconfirm || goto :error
+pyinstaller idm.spec --noconfirm --distpath build\dist --workpath build\pyi_build || goto :error
 
 where makensis >nul 2>nul
 if %errorlevel%==0 (

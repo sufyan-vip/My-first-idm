@@ -4,7 +4,11 @@ PyInstaller specification for InternetDownloadManager.
 
 Builds a single, self-contained, windowed executable:
 
-    pyinstaller idm.spec --noconfirm
+    pyinstaller idm.spec --noconfirm --distpath build/dist --workpath build/pyi_build
+
+(--distpath/--workpath matter: PyInstaller defaults to ./dist and ./build in
+the *current* directory, while the rest of the project - installer.nsi,
+.gitignore, README, CI uploads - expects everything under build/dist.)
 
 The result is a single, portable ``build/dist/InternetDownloadManager.exe``
 – run it directly, or wrap it with ``build/installer.nsi`` (NSIS) for a

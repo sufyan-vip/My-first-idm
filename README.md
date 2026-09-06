@@ -165,7 +165,7 @@ Creates a virtualenv, installs dependencies, runs the test suite and produces
 ### Manual
 ```bat
 pip install -r requirements.txt
-pyinstaller idm.spec --noconfirm
+pyinstaller idm.spec --noconfirm --distpath build/dist --workpath build/pyi_build
 makensis build\installer.nsi
 ```
 
