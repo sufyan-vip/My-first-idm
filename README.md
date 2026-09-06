@@ -174,15 +174,22 @@ The [build workflow](.github/workflows/build.yml) runs on every push, PR and
 manual dispatch:
 
 1. **Test** – full pytest suite (offscreen Qt) on `windows-latest`.
-2. **Build** – PyInstaller onefile exe + NSIS installer, uploaded as run
-   artifacts.
+2. **Build** – PyInstaller onefile exe, then NSIS installer, uploaded as run
+   artifacts. NSIS is installed on the fly with Chocolatey because
+   `windows-latest` (the `windows-2025` image) does not ship `makensis` –
+   only `windows-2022` preinstalls NSIS 3.10.
 3. **Release** – when you push a tag like `v1.0.1`, the artifacts are
-   published as a GitHub Release automatically.
+   published as a GitHub Release automatically. The installer is uploaded
+   under the stable name `InternetDownloadManager-Setup.exe` (the versioned
+   `…-Setup-1.0.0.exe` stays in `build/dist/` too).
 
-> **Note:** the workflow is committed at
-> [`build/workflow-build.yml`](build/workflow-build.yml) – copy it to
-> `.github/workflows/build.yml` to activate it (GitHub App tokens without the
-> *workflows* permission cannot push that path directly).
+> **Note:** the corrected workflow is committed at
+> [`build/workflow-build.yml`](build/workflow-build.yml) – copy its contents
+> into `.github/workflows/build.yml` to activate it. GitHub refuses pushes to
+> `.github/workflows/**` from an App token that lacks the *workflows*
+> permission, so that one file has to be edited by you (the GitHub web editor
+> works: **Actions → Build Windows EXE → ⋯ → Edit**, or open
+> `.github/workflows/build.yml` and press `e`).
 
 You can also trigger it manually from the *Actions* tab
 (`workflow_dispatch`) and download the artifacts from the run summary.
