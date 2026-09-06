@@ -17,9 +17,9 @@
 !define APP_PUBLISHER "sufyan-vip"
 !define APP_EXE       "InternetDownloadManager.exe"
 
-!ifdef __FILEDIR__
-  !cd "${__FILEDIR__}"
-!endif
+; NOTE: do not !cd anywhere – makensis already switches to the directory of
+; this script by default (unless /NOCD is given), and all paths below are
+; relative to it (dist\..., app_icon.ico).
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "dist\InternetDownloadManager-Setup-${APP_VERSION}.exe"
@@ -45,7 +45,7 @@ Unicode true
 
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_PAGE_UNFINISH
+!insertmacro MUI_UNPAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
 
@@ -77,14 +77,14 @@ Section "Install" SecInstall
     CreateShortcut  "$SMPROGRAMS\${APP_SHORT}\${APP_NAME}.lnk"    "$INSTDIR\${APP_EXE}"
     CreateShortcut  "$SMPROGRAMS\${APP_SHORT}\Uninstall ${APP_SHORT}.lnk" "$INSTDIR\Uninstall ${APP_SHORT}.exe"
     CreateShortcut  "$DESKTOP\${APP_NAME}.lnk"                    "$INSTDIR\${APP_EXE}"
-    CreateShortcut  "$SENDTOIN\${APP_NAME}.lnk"                   "$INSTDIR\${APP_EXE}"
+    CreateShortcut  "$SENDTO\${APP_NAME}.lnk"                     "$INSTDIR\${APP_EXE}"
 SectionEnd
 
 Section "Uninstall"
     Delete "$SMPROGRAMS\${APP_SHORT}\${APP_NAME}.lnk"
     Delete "$SMPROGRAMS\${APP_SHORT}\Uninstall ${APP_SHORT}.lnk"
     Delete "$DESKTOP\${APP_NAME}.lnk"
-    Delete "$SENDTOIN\${APP_NAME}.lnk"
+    Delete "$SENDTO\${APP_NAME}.lnk"
     RMDir  "$SMPROGRAMS\${APP_SHORT}"
 
     DeleteRegKey  HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_SHORT}"
