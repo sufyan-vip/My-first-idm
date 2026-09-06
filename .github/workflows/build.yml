@@ -1,0 +1,134 @@
+# ===========================================================================
+#  Internet Download Manager – CI / build pipeline
+#
+#  • Runs the full test suite (offscreen Qt) on every push / PR.
+#  • Builds the Windows .exe with PyInstaller (onefile, windowed).
+#  • Wraps it in an NSIS installer.
+#  • Uploads the artifacts to the run, and – when a `v*` tag is pushed –
+#    publishes them as a GitHub Release.
+# ===========================================================================
+
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------ tests
+  test:
+    name: Test (Windows, offscreen Qt)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          python -m pytest tests -v
+
+  # ------------------------------------------------------------------ build
+  build:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: pyinstaller idm.spec --noconfirm
+
+      - name: Build NSIS installer
+        run: makensis build/installer.nsi
+
+      - name: Package portable exe (zip)
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build/dist/InternetDownloadManager.exe" `
+                           -DestinationPath "build/dist/InternetDownloadManager-portable.zip"
+
+      - name: Upload portable EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: InternetDownloadManager-windows
+          path: build/dist/InternetDownloadManager.exe
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: InternetDownloadManager-setup
+          path: build/dist/InternetDownloadManager-Setup-*.exe
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: InternetDownloadManager-portable
+          path: build/dist/InternetDownloadManager-portable.zip
+
+  # ---------------------------------------------------------------- release
+  release:
+    name: Publish Release
+    runs-on: windows-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download portable EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: InternetDownloadManager-windows
+          path: release
+
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: InternetDownloadManager-setup
+          path: release
+
+      - name: Download portable zip
+        uses: actions/download-artifact@v4
+        with:
+          name: InternetDownloadManager-portable
+          path: release
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "release/InternetDownloadManager.exe" \
+            "release/InternetDownloadManager-Setup-*.exe" \
+            "release/InternetDownloadManager-portable.zip" \
+            --title "Internet Download Manager ${GITHUB_REF_NAME#v}" \
+            --notes "Windows build - portable single exe, NSIS installer and portable zip." \
+            --verify-tag
