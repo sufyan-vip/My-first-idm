@@ -1,7 +1,7 @@
 ; ===========================================================================
-;  Internet Download Manager - NSIS installer
+;  TurboFetch Download Manager - NSIS installer
 ;
-;  Wraps the portable build/dist/InternetDownloadManager.exe into a
+;  Wraps the portable build/dist/TurboFetch.exe into a
 ;  classic setup package with Start Menu / Desktop shortcuts and an
 ;  uninstaller.
 ;
@@ -11,18 +11,18 @@
 ;  Keep APP_VERSION in sync with utils/constants.py (APP_VERSION).
 ; ===========================================================================
 
-!define APP_NAME      "Internet Download Manager"
-!define APP_SHORT     "IDM Pro"
+!define APP_NAME      "TurboFetch Download Manager"
+!define APP_SHORT     "TurboFetch"
 !define APP_VERSION   "1.0.0"
 !define APP_PUBLISHER "sufyan-vip"
-!define APP_EXE       "InternetDownloadManager.exe"
+!define APP_EXE       "TurboFetch.exe"
 
 ; NOTE: do not !cd anywhere – makensis already switches to the directory of
 ; this script by default (unless /NOCD is given), and all paths below are
 ; relative to it (dist\..., app_icon.ico).
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "dist\InternetDownloadManager-Setup-${APP_VERSION}.exe"
+OutFile "dist\TurboFetch-Setup-${APP_VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${APP_SHORT}"
 InstallDirRegKey HKLM "Software\${APP_SHORT}" "InstallDir"
 RequestExecutionLevel admin

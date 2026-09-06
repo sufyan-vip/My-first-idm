@@ -1,4 +1,4 @@
-# Internet Download Manager
+# TurboFetch Download Manager
 
 A production-grade, multi-threaded download manager for **Windows**, built with
 **Python 3.11 + PyQt6** and packaged as a standalone `.exe` with **PyInstaller**.
@@ -72,9 +72,9 @@ A production-grade, multi-threaded download manager for **Windows**, built with
 ## Installation
 
 ### Prebuilt (easiest)
-Download `InternetDownloadManager-Setup-*.exe` from the
+Download `TurboFetch-Setup-*.exe` from the
 [Releases](../../releases) page and run the installer, or grab the portable
-`InternetDownloadManager.exe` and run it – no installation needed.
+`TurboFetch.exe` and run it – no installation needed.
 
 ### From source
 ```bat
@@ -88,14 +88,14 @@ python main.py
 
 ## Usage
 
-- **Add a download** – `Ctrl+T`, the toolbar `➕`, paste from the clipboard
+- **Add a download** – `Ctrl+T`, the toolbar Add button, paste from the clipboard
   (`Ctrl+V`), drag & drop, or enable clipboard auto-detection in Settings.
 - **Manage** – single-click to select (multi-select supported), right-click a
   row for pause / resume / cancel / open file / open folder / re-download /
   details / delete.
 - **Queue** – use the *Queue* menu for start / pause queue and *History*.
 - **Tray** – close the window to keep downloading in the background
-  (Settings → Minimize to tray).
+  (Settings > Minimize to tray).
 
 ### CLI mode (source runs)
 ```bat
@@ -160,7 +160,7 @@ My-first-idm/
 build\build.bat
 ```
 Creates a virtualenv, installs dependencies, runs the test suite and produces
-`build\dist\InternetDownloadManager.exe` plus the NSIS installer.
+`build\dist\TurboFetch.exe` plus the NSIS installer.
 
 ### Manual
 ```bat
@@ -180,8 +180,8 @@ manual dispatch:
    only `windows-2022` preinstalls NSIS 3.10.
 3. **Release** – when you push a tag like `v1.0.1`, the artifacts are
    published as a GitHub Release automatically. The installer is uploaded
-   under the stable name `InternetDownloadManager-Setup.exe` (the versioned
-   `…-Setup-1.0.0.exe` stays in `build/dist/` too).
+   under the stable name `TurboFetch-Setup.exe` (the versioned
+   `TurboFetch-Setup-1.0.0.exe` stays in `build/dist/` too).
 
 > **Note:** the corrected workflow is committed at
 > [`build/workflow-build.yml`](build/workflow-build.yml) – copy its contents

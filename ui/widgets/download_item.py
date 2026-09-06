@@ -13,14 +13,9 @@ action menu (pause/resume/cancel/open file/folder/re-download/delete).
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
-
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QCursor
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
-    QAbstractItemView,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -30,23 +25,24 @@ from PyQt6.QtWidgets import (
 )
 
 from database.models import EngineSnapshot
-from utils.constants import CATEGORY_INFO, Category, Priority, Status
-from utils.file_utils import category_emoji, format_eta, human_size, human_speed
+from utils.constants import Status
+from utils.file_utils import format_eta, human_size, human_speed
 from ui.widgets.progress_bar import DownloadProgressBar
+from ui.icons import category_icon, icon
 
 _STATUS_CHIP = {
-    Status.QUEUED: ("⏳ Queued", "dim"),
-    Status.DOWNLOADING: ("⬇ Downloading", "accentText"),
-    Status.PAUSED: ("⏸ Paused", "warningText"),
-    Status.COMPLETED: ("✅ Done", "successText"),
-    Status.FAILED: ("✖ Failed", "errorText"),
-    Status.CANCELED: ("⊘ Canceled", "dim"),
-    Status.SCHEDULED: ("🕒 Scheduled", "dim"),
+    Status.QUEUED: ("Queued", "dim"),
+    Status.DOWNLOADING: ("Downloading", "accentText"),
+    Status.PAUSED: ("Paused", "warningText"),
+    Status.COMPLETED: ("Done", "successText"),
+    Status.FAILED: ("Failed", "errorText"),
+    Status.CANCELED: ("Canceled", "dim"),
+    Status.SCHEDULED: ("Scheduled", "dim"),
 }
 
 
-def _priority_icon(p: str) -> str:
-    return {"high": "🔺", "medium": "▶", "low": "🔻"}.get(p, "▶")
+def _priority_text(p: str) -> str:
+    return {"high": "High", "medium": "Medium", "low": "Low"}.get(p, "Medium")
 
 
 class DownloadItemWidget(QWidget):
@@ -65,6 +61,7 @@ class DownloadItemWidget(QWidget):
     def __init__(self, download_id: int, parent=None) -> None:
         super().__init__(parent)
         self.download_id = download_id
+        self._current_status = ""
         self.setFixedSize(0, 108)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMouseTracking(True)
@@ -74,8 +71,7 @@ class DownloadItemWidget(QWidget):
         layout.setSpacing(14)
 
         # ------------------------------------------------ category icon
-        self.icon_label = QLabel("📂")
-        self.icon_label.setStyleSheet("font-size: 30px;")
+        self.icon_label = QLabel()
         self.icon_label.setFixedWidth(40)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.icon_label)
@@ -85,7 +81,7 @@ class DownloadItemWidget(QWidget):
         main.setSpacing(4)
 
         row1 = QHBoxLayout()
-        self.name_label = QLabel("…")
+        self.name_label = QLabel("...")
         self.name_label.setStyleSheet("font-weight: 600; font-size: 14px;")
         self.name_label.setToolTip("")
         row1.addWidget(self.name_label, 1)
@@ -98,7 +94,7 @@ class DownloadItemWidget(QWidget):
 
         self.progress = DownloadProgressBar()
         self.progress.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.progress.clicked.connect(lambda: self.open_file.emit(self.download_id))
+        self.progress.clicked.connect(self._primary_action)
         main.addWidget(self.progress)
 
         row2 = QHBoxLayout()
@@ -128,14 +124,15 @@ class DownloadItemWidget(QWidget):
         self.setMinimumWidth(width)
 
     def update_snapshot(self, snap: EngineSnapshot) -> None:
-        self.icon_label.setText(category_emoji(snap.category))
-        self.name_label.setText(snap.file_name or "…")
+        self._current_status = snap.status
+        self.icon_label.setPixmap(category_icon(snap.category).pixmap(28, 28))
+        self.name_label.setText(snap.file_name or "...")
         self.name_label.setToolTip(f"URL: {snap.url}\nSave to: {snap.save_path}")
 
         chip_text, chip_obj = _STATUS_CHIP.get(
             snap.status, (snap.status.title(), "dim"))
         if snap.status in (Status.QUEUED, Status.SCHEDULED):
-            chip_text += f"  {_priority_icon(snap.priority)}"
+            chip_text += f"  Priority: {_priority_text(snap.priority)}"
         self.chip_label.setText(chip_text)
         self.chip_label.setObjectName(chip_obj)
         self.chip_label.style().unpolish(self.chip_label)
@@ -161,38 +158,38 @@ class DownloadItemWidget(QWidget):
             self.progress.setRange(0, 1000)
             self.progress.setProgressPerMille(per_mille)
         else:
-            # unknown total size – show bytes transferred instead of a %
+            # unknown total size - show bytes transferred instead of a %
             self.progress.setRange(0, 1)
             self.progress.setValue(1)
             self.progress.setFormat(human_size(snap.downloaded_size))
 
         # meta line
         if snap.status == Status.COMPLETED:
-            self.speed_label.setText("✅")
+            self.speed_label.setText("Complete")
             when = snap.completed_at or ""
             self.meta_label.setText(
                 f"{human_size(snap.file_size)}   •   {when[:16].replace('T', ' ')}")
             self.eta_label.setText("")
-            self.seg_label.setText(f"SHA256 {snap.checksum_sha256[:12]}…"
+            self.seg_label.setText(f"SHA256 {snap.checksum_sha256[:12]}..."
                                    if snap.checksum_sha256 else "")
         elif snap.status == Status.FAILED:
-            self.speed_label.setText("✖")
+            self.speed_label.setText("Failed")
             self.meta_label.setText(snap.error_message[:80] or "Failed")
             self.eta_label.setText("")
             self.seg_label.setText("")
         elif snap.status == Status.QUEUED:
-            self.speed_label.setText("⏳ waiting")
+            self.speed_label.setText("Waiting")
             self.meta_label.setText(f"{human_size(snap.file_size)}"
                                     if snap.file_size else "size unknown")
             self.eta_label.setText("")
             self.seg_label.setText(f"priority: {snap.priority}")
         elif snap.status == Status.SCHEDULED:
-            self.speed_label.setText("🕒 scheduled")
+            self.speed_label.setText("Scheduled")
             self.meta_label.setText(snap.scheduled_time or "")
             self.eta_label.setText("")
             self.seg_label.setText(f"priority: {snap.priority}")
         elif snap.status == Status.PAUSED:
-            self.speed_label.setText("⏸ paused")
+            self.speed_label.setText("Paused")
             self.meta_label.setText(
                 f"{human_size(snap.downloaded_size)} / "
                 f"{human_size(snap.file_size)}" if snap.file_size else
@@ -202,53 +199,62 @@ class DownloadItemWidget(QWidget):
                 f"segments {snap.segments_completed}/{snap.segments_total}")
         else:  # downloading
             self.speed_label.setText(
-                f"⬇ {human_speed(snap.speed)}  (avg {human_speed(snap.avg_speed)})")
+                f"{human_speed(snap.speed)}  (avg {human_speed(snap.avg_speed)})")
             size_text = (f"{human_size(snap.downloaded_size)} / "
                          f"{human_size(snap.file_size)}") if snap.file_size else \
                 human_size(snap.downloaded_size)
             self.meta_label.setText(size_text)
             eta = snap.eta_seconds
             self.eta_label.setText(f"ETA {format_eta(eta)}"
-                                   if eta == eta and eta > 0 else "ETA …")
+                                   if eta == eta and eta > 0 else "ETA ...")
             self.seg_label.setText(
                 f"segments {snap.segments_completed}/{snap.segments_total} "
                 f"({snap.segments_active} active)")
 
     # ------------------------------------------------------------ mouse menu
 
+    def _primary_action(self) -> None:
+        if self._current_status == Status.COMPLETED:
+            self.open_file.emit(self.download_id)
+        else:
+            self.request_details.emit(self.download_id)
+
     def contextMenuEvent(self, event) -> None:  # noqa: N802
         snap_id = self.download_id
         menu = QMenu(self)
         m = menu
 
-        a = QAction("⏸ Pause", m)
+        a = QAction(icon("pause"), "Pause", m)
         a.triggered.connect(lambda: self.request_pause.emit(snap_id))
         m.addAction(a)
-        a = QAction("▶ Resume", m)
+        a = QAction(icon("resume"), "Resume", m)
         a.triggered.connect(lambda: self.request_resume.emit(snap_id))
         m.addAction(a)
-        a = QAction("⊘ Cancel download", m)
+        a = QAction(icon("cancel"), "Cancel download", m)
         a.triggered.connect(lambda: self.request_cancel.emit(snap_id))
         m.addAction(a)
         m.addSeparator()
-        a = QAction("📄 Open file", m)
+        a = QAction(icon("file"), "Open file", m)
         a.triggered.connect(lambda: self.open_file.emit(snap_id))
         m.addAction(a)
-        a = QAction("📁 Open folder", m)
+        a = QAction(icon("folder"), "Open folder", m)
         a.triggered.connect(lambda: self.open_folder.emit(snap_id))
         m.addAction(a)
-        a = QAction(" Download again", m)
+        a = QAction(icon("download"), "Download again", m)
         a.triggered.connect(lambda: self.request_redownload.emit(snap_id))
         m.addAction(a)
-        a = QAction("ℹ Details", m)
+        a = QAction(icon("info"), "Details", m)
         a.triggered.connect(lambda: self.request_details.emit(snap_id))
         m.addAction(a)
         m.addSeparator()
-        a = QAction("🗑 Delete from list", m)
+        a = QAction(icon("delete"), "Delete from list", m)
         a.triggered.connect(lambda: self.request_delete.emit(snap_id))
         m.addAction(a)
         menu.exec(event.globalPos())
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
-        self.open_file.emit(self.download_id)
+        # Opening a still-downloading partial file can hand a locked/incomplete
+        # path to the OS shell. That caused crashes on some Windows builds.
+        # Double-click only opens completed files; active rows show details.
+        self._primary_action()
         super().mouseDoubleClickEvent(event)

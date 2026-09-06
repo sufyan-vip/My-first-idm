@@ -1,5 +1,5 @@
 /* =====================================================================
-   IDM Pro – Light theme
+   TurboFetch – Light theme
    Palette:
      background  #f5f6fa
      cards       #ffffff (soft shadow via borders)
@@ -29,6 +29,22 @@ QLabel#accentText { color: #0984e3; }
 QLabel#successText { color: #00946e; }
 QLabel#warningText { color: #c98a10; }
 QLabel#errorText   { color: #d63031; }
+QLabel#heroTitle {
+    color: #16213e;
+    font-size: 22px;
+    font-weight: 700;
+}
+QFrame#quickDownloadCard {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #ffffff, stop:1 #eaf4ff);
+    border: 1px solid #bfdcff;
+    border-radius: 18px;
+}
+QLineEdit#quickUrlEdit {
+    min-height: 34px;
+    font-size: 14px;
+    border-radius: 10px;
+}
 
 /* menu */
 QMenuBar {

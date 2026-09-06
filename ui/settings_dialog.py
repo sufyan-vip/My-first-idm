@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 from core.proxy_handler import test_connection
 from utils.constants import Category, PostAction, POST_ACTION_LABELS
 from utils.logger import get_logger
+from ui.icons import icon
 
 log = get_logger("ui.settings")
 
@@ -35,7 +36,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.config = config
         self.engine = engine
-        self.setWindowTitle("⚙ Settings")
+        self.setWindowTitle("Settings")
         self.resize(640, 540)
 
         layout = QVBoxLayout(self)
@@ -66,13 +67,14 @@ class SettingsDialog(QDialog):
         g = QFormLayout(general)
         folder_row = QHBoxLayout()
         self.folder_edit = QLineEdit(self.config.get("download_folder"))
-        browse = QPushButton("Browse…")
+        browse = QPushButton("Browse...")
+        browse.setIcon(icon("folder"))
         browse.clicked.connect(self._browse_folder)
         folder_row.addWidget(self.folder_edit, 1)
         folder_row.addWidget(browse)
         g.addRow("Default folder:", self._wrap(folder_row))
 
-        self.categorize_check = QCheckBox("Categorize into subfolders (Documents/Music/…)")
+        self.categorize_check = QCheckBox("Categorize into subfolders (Documents/Music/etc.)")
         self.categorize_check.setChecked(self.config.get_bool("categorize"))
         g.addRow(self.categorize_check)
 
@@ -128,7 +130,7 @@ class SettingsDialog(QDialog):
         self.clip_check.setChecked(self.config.get_bool("clipboard_detect"))
         a.addRow(self.clip_check)
 
-        self.clip_auto_check = QCheckBox("… and add them to the queue automatically")
+        self.clip_auto_check = QCheckBox("Add detected links to the queue automatically")
         self.clip_auto_check.setChecked(self.config.get_bool("clipboard_auto_add"))
         a.addRow(self.clip_auto_check)
 
@@ -138,7 +140,7 @@ class SettingsDialog(QDialog):
         v.addWidget(app)
 
         self.duplicate_combo = QComboBox()
-        self.duplicate_combo.addItem("Ask nothing – rename automatically (file (1).ext)", "rename")
+        self.duplicate_combo.addItem("Rename automatically (file (1).ext)", "rename")
         self.duplicate_combo.addItem("Overwrite existing file", "overwrite")
         self.duplicate_combo.addItem("Keep existing file (skip)", "skip")
         self.duplicate_combo.setCurrentIndex(self.duplicate_combo.findData(
@@ -199,7 +201,8 @@ class SettingsDialog(QDialog):
         p.addRow("Password:", self.proxy_pass)
 
         test_row = QHBoxLayout()
-        self.test_proxy_btn = QPushButton("🔌 Test proxy connection")
+        self.test_proxy_btn = QPushButton("Test proxy connection")
+        self.test_proxy_btn.setIcon(icon("network"))
         self.test_proxy_btn.clicked.connect(self._test_proxy)
         self.proxy_status = QLabel("")
         self.proxy_status.setObjectName("secondaryText")
@@ -237,7 +240,7 @@ class SettingsDialog(QDialog):
         v.addWidget(box)
 
         note = QLabel(
-            "💡 “Shut down PC” triggers when the LAST active download finishes "
+            "Tip: Shut down PC triggers when the LAST active download finishes "
             "and the queue is empty (30-second delay, so you can cancel it).")
         note.setObjectName("dim")
         note.setWordWrap(True)
@@ -261,7 +264,7 @@ class SettingsDialog(QDialog):
             self.folder_edit.setText(folder)
 
     def _test_proxy(self) -> None:
-        self.proxy_status.setText("Testing…")
+        self.proxy_status.setText("Testing...")
         ok, message = test_connection(
             self.proxy_type.currentData(),
             self.proxy_host.text().strip(),
@@ -270,7 +273,7 @@ class SettingsDialog(QDialog):
             self.proxy_pass.text().strip(),
         )
         self.proxy_status.setObjectName("successText" if ok else "errorText")
-        self.proxy_status.setText(("✅ " if ok else "✖ ") + message)
+        self.proxy_status.setText(("OK: " if ok else "Failed: ") + message)
 
     # ---------------------------------------------------------------- save
 

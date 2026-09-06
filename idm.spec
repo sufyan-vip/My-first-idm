@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller specification for InternetDownloadManager.
+PyInstaller specification for TurboFetch.
 
 Builds a single, self-contained, windowed executable:
 
@@ -10,7 +10,7 @@ Builds a single, self-contained, windowed executable:
 the *current* directory, while the rest of the project - installer.nsi,
 .gitignore, README, CI uploads - expects everything under build/dist.)
 
-The result is a single, portable ``build/dist/InternetDownloadManager.exe``
+The result is a single, portable ``build/dist/TurboFetch.exe``
 – run it directly, or wrap it with ``build/installer.nsi`` (NSIS) for a
 desktop-shortcut + uninstaller setup package.
 
@@ -27,7 +27,7 @@ Notes
 
 from PyInstaller.utils.hooks import collect_submodules
 
-APP_NAME = "InternetDownloadManager"
+APP_NAME = "TurboFetch"
 
 hiddenimports = [
     # lazily imported Qt modules

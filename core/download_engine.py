@@ -64,7 +64,7 @@ from utils.constants import (
 from utils.file_utils import file_checksums, human_speed, move_or_replace, unique_path
 from utils.logger import get_logger
 from utils.network_utils import is_online
-from utils.notifications import notify, play_sound
+from utils.notifications import play_sound
 from utils.system_utils import open_file, open_folder, run_antivirus_scan, shutdown_pc
 
 log = get_logger("engine")
@@ -1105,8 +1105,8 @@ class DownloadEngine(QObject):
             self.download_resumed.emit(0)
 
     def _post_action(self, dl: Download) -> None:
-        if self.config.get_bool("notifications_enabled", True):
-            notify("Download complete", dl.file_name)
+        # Desktop notifications are emitted by the UI layer. Keeping them out
+        # of the engine prevents duplicate Windows toasts for one completed file.
         if self.config.get_bool("sound_enabled", True):
             play_sound("complete")
         action = dl.post_action or self.config.get("post_action", PostAction.NONE)
